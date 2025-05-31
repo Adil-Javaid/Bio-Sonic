@@ -188,7 +188,9 @@ const LoginScreen = () => {
       await AsyncStorage.setItem("userRole", response.role || "user");
 
       Alert.alert("Success", "Logged in successfully!");
-      navigation.navigate(response.role === "user" ? "Home" : "Home");
+      // In your LoginScreen or Signup screen where you navigate after successful auth
+      navigation.navigate(response.role === "user" ? "Main" : "Main"); // Instead of navigation.navigate('Home')
+      // navigation.navigate(response.role === "user" ? "Home" : "Home");
     } catch (err) {
       let errorMessage = "An unexpected error occurred";
       if (err.response) {

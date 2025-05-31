@@ -1,18 +1,53 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons"; // or any other icon library you prefer
 
 // Screens
-import LoginScreen from './src/screens/LoginScreen';
+import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import NewDiagnosisScreen from "./src/screens/NewDiagnosisScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
-import SplashScreen from './src/screens/SplashScreen';
-import MedicalSignUp from './src/screens/Signup';
-// import NotFoundScreen from "./src/screens/NotFoundScreen"; // Optional
+import SplashScreen from "./src/screens/SplashScreen";
+import MedicalSignUp from "./src/screens/Signup";
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// Tab Navigator
+const MainTabs = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === "Home") {
+            iconName = focused ? "home" : "home-outline";
+          } else if (route.name === "Prediction") {
+            iconName = focused ? "analytics" : "analytics-outline";
+          } else if (route.name === "History") {
+            iconName = focused ? "time" : "time-outline";
+          } else if (route.name === "Settings") {
+            iconName = focused ? "settings" : "settings-outline";
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: "tomato",
+        tabBarInactiveTintColor: "gray",
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Prediction" component={NewDiagnosisScreen} />
+      <Tab.Screen name="History" component={HistoryScreen} />
+      <Tab.Screen name="Settings" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
 
 const AppNavigator = () => {
   return (
@@ -24,11 +59,10 @@ const AppNavigator = () => {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="SignUp" component={MedicalSignUp} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="NewDiagnosis" component={NewDiagnosisScreen} />
-        <Stack.Screen name="History" component={HistoryScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        {/* <Stack.Screen name="NotFound" component={NotFoundScreen} /> */}
+        <Stack.Screen name="Main" component={MainTabs} />
+        {/* If you need to show any of these screens as full screens (not in tabs), keep them here */}
+        {/* <Stack.Screen name="NewDiagnosis" component={NewDiagnosisScreen} /> */}
+        {/* <Stack.Screen name="Profile" component={ProfileScreen} /> */}
       </Stack.Navigator>
     </NavigationContainer>
   );
