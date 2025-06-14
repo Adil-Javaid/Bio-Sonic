@@ -7,20 +7,21 @@ import {
   Platform,
   PermissionsAndroid,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
-import DocumentPicker from "react-native-document-picker";
+import * as DocumentPicker from "expo-document-picker";
 import { MaterialIcons, FontAwesome, Feather } from "@expo/vector-icons";
-import BluetoothManager from "../services/BluetoothManager"; // Custom Bluetooth module
+import * as Permissions from "expo-permissions";
+const API_URL = "http://192.168.100.1:7860/predict"; // Replace with your laptop's local IP
 
 const HomeScreen = ({ navigation }) => {
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
-  const [isConnected, setIsConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState("");
   const [audioUri, setAudioUri] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Request microphone permissions
   useEffect(() => {
@@ -53,63 +54,9 @@ const HomeScreen = ({ navigation }) => {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-
-      // Initialize Bluetooth
-      initializeBluetooth();
     })();
   }, []);
 
-  // Initialize Bluetooth connection
-  const initializeBluetooth = async () => {
-    try {
-      const isEnabled = await BluetoothManager.checkBluetoothEnabled();
-      if (!isEnabled) {
-        Alert.alert(
-          "Bluetooth Disabled",
-          "Please enable Bluetooth to connect to your stethoscope"
-        );
-        return;
-      }
-
-      // Scan for devices
-      const devices = await BluetoothManager.scanDevices();
-      const stethoscope = devices.find(
-        (device) =>
-          device.name?.includes("Littmann") ||
-          device.name?.includes("Stethoscope") ||
-          device.name?.includes("Eko")
-      );
-
-      if (stethoscope) {
-        const connected = await BluetoothManager.connect(stethoscope.id);
-        if (connected) {
-          setIsConnected(true);
-          setDeviceName(stethoscope.name);
-
-          // Example: Start monitoring audio characteristics
-          // You'll need to replace these with your device's actual UUIDs
-          BluetoothManager.monitorCharacteristic(
-            "SERVICE_UUID",
-            "CHARACTERISTIC_UUID",
-            (data) => {
-              // Process incoming audio data
-              console.log("Received audio data:", data);
-            }
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Bluetooth error:", error);
-      Alert.alert("Bluetooth Error", error.message);
-    }
-  };
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      BluetoothManager.destroy();
-    };
-  }, []);
   // Start recording
   const startRecording = async () => {
     try {
@@ -151,79 +98,196 @@ const HomeScreen = ({ navigation }) => {
       setAudioUri(uri);
       console.log("Recording saved to", uri);
 
-      // Convert to WAV format if needed
-      await convertToWav(uri);
+      Alert.alert("Recording Saved", "Your recording is ready for analysis");
     } catch (err) {
       console.error("Failed to stop recording", err);
     }
   };
 
-  // Convert audio to WAV format
-  const convertToWav = async (uri) => {
+  // Upload existing WAV file
+  // const uploadAudio = async () => {
+  //   try {
+  //     const result = await DocumentPicker.getDocumentAsync({
+  //       type: "audio/wav",
+  //       copyToCacheDirectory: true,
+  //     });
+
+  //     if (result.type === "success") {
+  //       if (result.name.endsWith(".wav")) {
+  //         setAudioUri(result.uri);
+  //         Alert.alert("File Selected", "Your WAV file is ready for analysis");
+  //       } else {
+  //         Alert.alert("Invalid File", "Please select a WAV format file");
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error("File picker error:", err);
+  //     Alert.alert("Error", "Failed to select file");
+  //   }
+  // };
+
+  // Test connection to backend
+  const testConnection = async () => {
+    const API_URL = "http://192.168.100.9:7860/test"; // Direct IP connection
+    console.log(`Testing connection to: ${API_URL}`);
+
     try {
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) {
-        throw new Error("File does not exist");
+      // First test basic network reachability
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(API_URL, {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
+        },
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
       }
 
-      // In a real app, you would use a proper audio conversion library
-      // This is just a placeholder for the concept
-      const wavUri = `${FileSystem.cacheDirectory}recording_${Date.now()}.wav`;
-      await FileSystem.copyAsync({ from: uri, to: wavUri });
+      const result = await response.json();
+      console.log("Connection successful:", result);
 
-      return wavUri;
+      Alert.alert(
+        "✅ Connection Successful",
+        `Connected to ${result.server_ip}\n\n` +
+          `Mobile IP: 192.168.100.11\n` +
+          `Server IP: 192.168.100.9`
+      );
+
+      return true;
     } catch (error) {
-      console.error("Conversion error:", error);
-      return uri; // Fallback to original if conversion fails
+      console.error("Connection failed:", error);
+
+      let errorMsg = error.message;
+      if (error.name === "AbortError") {
+        errorMsg = "Request timed out (5s) - check firewall/antivirus";
+      } else if (error.message.includes("Network request failed")) {
+        errorMsg = "Network unreachable - check WiFi settings";
+      }
+
+      Alert.alert(
+        "❌ Connection Failed",
+        `${errorMsg}\n\n` +
+          `Tried connecting from:\n` +
+          `Mobile (192.168.100.11) → Server (192.168.100.9:7860)\n\n` +
+          `Troubleshooting:\n` +
+          `1. Verify both devices on same WiFi\n` +
+          `2. Disable Windows Defender Firewall temporarily\n` +
+          `3. Try ping 192.168.100.9 from mobile terminal`
+      );
+
+      return false;
     }
   };
 
   // Upload existing WAV file
   const uploadAudio = async () => {
     try {
-      const res = await DocumentPicker.pick({
-        type: [DocumentPicker.types.audio],
+      // 1. First ensure we have storage permissions
+      if (Platform.OS === "android") {
+        // For Android 10 and below
+        const apiLevel = parseInt(Platform.Version.toString(), 10);
+
+        if (apiLevel < 30) {
+          // Android 11 and below needs legacy permission
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+            {
+              title: "Storage Permission",
+              message: "App needs access to your files",
+              buttonPositive: "OK",
+            }
+          );
+
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert(
+              "Permission required",
+              "Please allow storage access in settings"
+            );
+            return;
+          }
+        }
+      }
+
+      // 2. Launch the document picker to browse storage
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["audio/wav", "audio/*", "*/*", "application/pdf"], // More permissive MIME types
+        copyToCacheDirectory: true,
+        multiple: false,
       });
 
-      if (res[0].type === "audio/wav" || res[0].name.endsWith(".wav")) {
-        setAudioUri(res[0].uri);
-        Alert.alert("File Selected", "WAV file ready for analysis");
-      } else {
-        Alert.alert("Invalid File", "Please select a WAV format file");
+      console.log("Picker result:", result);
+
+      // 3. Handle the selected file
+      if (result.type === "success") {
+        // Verify it's a WAV file
+        if (!result.name.toLowerCase().endsWith(".wav")) {
+          Alert.alert("Invalid File", "Please select a .wav audio file");
+          return;
+        }
+
+        // For Android, ensure we have a usable file URI
+        let finalUri = result.uri;
+        if (Platform.OS === "android") {
+          // Handle content:// URIs
+          if (result.uri.startsWith("content://")) {
+            const cacheFile = `${FileSystem.cacheDirectory}${result.name}`;
+            await FileSystem.copyAsync({
+              from: result.uri,
+              to: cacheFile,
+            });
+            finalUri = cacheFile;
+          }
+        }
+
+        // Verify file exists
+        const fileInfo = await FileSystem.getInfoAsync(finalUri);
+        if (!fileInfo.exists) {
+          throw new Error("File not found after selection");
+        }
+
+        setAudioUri(finalUri);
+        Alert.alert("Success", `${result.name} selected and ready for upload`);
       }
-    } catch (err) {
-      if (DocumentPicker.isCancel(err)) {
-        // User cancelled the picker
-      } else {
-        Alert.alert("Error", "Failed to select file");
-        console.error(err);
-      }
+    } catch (error) {
+      console.error("File selection error:", error);
+      Alert.alert(
+        "Error",
+        error.message || "Failed to select file. Please try again."
+      );
     }
   };
 
   // Send audio for prediction
-  const sendForPrediction = async () => {
+  const sendForPrediction = async (userId = null) => {
     if (!audioUri) {
       Alert.alert("No Audio", "Please record or upload an audio file first");
       return;
     }
 
+    setIsLoading(true);
+
     try {
       const formData = new FormData();
-      const fileInfo = await FileSystem.getInfoAsync(audioUri);
-
       formData.append("audio", {
         uri: audioUri,
         name: "recording.wav",
         type: "audio/wav",
       });
-
-      // Add metadata (example values - replace with actual user data)
       formData.append("age", "35");
       formData.append("chest", Array(21).fill(0).join(","));
-      formData.append("gender", "1,0,0"); // Example: male
+      formData.append("gender", "1,0,0");
 
-      const response = await fetch("http://your-api-url/predict", {
+      if (userId) {
+        formData.append("user_id", userId);
+      }
+
+      const response = await fetch(API_URL, {
         method: "POST",
         body: formData,
         headers: {
@@ -231,13 +295,84 @@ const HomeScreen = ({ navigation }) => {
         },
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const result = await response.json();
-      navigation.navigate("NewDiagnosis", { results: result });
+
+      // Store prediction ID for future reference
+      const predictionId = result.prediction_id;
+
+      navigation.navigate("NewDiagnosis", {
+        results: result.predictions,
+        audioUri: audioUri,
+        predictionId: predictionId,
+      });
     } catch (error) {
       console.error("Prediction error:", error);
-      Alert.alert("Error", "Failed to get prediction. Please try again.");
+      Alert.alert("Error", error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
+  // Send audio for prediction
+  // const sendForPrediction = async () => {
+  //   if (!audioUri) {
+  //     Alert.alert("No Audio", "Please record or upload an audio file first");
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+
+  //   try {
+  //     // Read the file content
+  //     const fileContent = await FileSystem.readAsStringAsync(audioUri, {
+  //       encoding: FileSystem.EncodingType.Base64,
+  //     });
+
+  //     // Create form data
+  //     const formData = new FormData();
+  //     formData.append("audio", {
+  //       uri: audioUri,
+  //       name: "recording.wav",
+  //       type: "audio/wav",
+  //     });
+
+  //     // Add metadata (example values - adjust as needed)
+  //     formData.append("age", "35");
+  //     formData.append("chest", Array(21).fill(0).join(","));
+  //     formData.append("gender", "1,0,0"); // Male example
+
+  //     const response = await fetch(API_URL, {
+  //       method: "POST",
+  //       body: formData,
+  //       headers: {
+  //         "Content-Type": "multipart/form-data",
+  //       },
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     const result = await response.json();
+  //     console.log("Prediction result:", result);
+
+  //     navigation.navigate("NewDiagnosis", {
+  //       results: result,
+  //       audioUri: audioUri,
+  //     });
+  //   } catch (error) {
+  //     console.error("Prediction error:", error);
+  //     Alert.alert(
+  //       "Error",
+  //       `Failed to get prediction: ${error.message}\n\nMake sure your laptop and phone are on the same network and the server is running.`
+  //     );
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   // Format time display
   const formatTime = (seconds) => {
@@ -256,19 +391,10 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.content}>
-        {/* Bluetooth Status */}
-        <View style={styles.bluetoothStatus}>
-          <MaterialIcons
-            name={isConnected ? "bluetooth-connected" : "bluetooth"}
-            size={24}
-            color={isConnected ? "#3b82f6" : "#64748b"}
-          />
-          <Text
-            style={[styles.bluetoothText, isConnected && styles.connectedText]}
-          >
-            {isConnected ? `Connected to ${deviceName}` : "Not connected"}
-          </Text>
-        </View>
+        {/* Connection Test Button */}
+        <TouchableOpacity style={styles.testButton} onPress={testConnection}>
+          <Text style={styles.testButtonText}>Test Server Connection</Text>
+        </TouchableOpacity>
 
         {/* Recording Section */}
         <View style={styles.card}>
@@ -328,12 +454,16 @@ const HomeScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.analyzeButton,
-            !audioUri && styles.analyzeButtonDisabled,
+            (!audioUri || isLoading) && styles.analyzeButtonDisabled,
           ]}
           onPress={sendForPrediction}
-          disabled={!audioUri}
+          disabled={!audioUri || isLoading}
         >
-          <Text style={styles.analyzeButtonText}>Analyze Recording</Text>
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.analyzeButtonText}>Analyze Recording</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -375,20 +505,15 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  bluetoothStatus: {
-    flexDirection: "row",
+  testButton: {
+    backgroundColor: "#10b981",
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
     marginBottom: 20,
-    padding: 12,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
   },
-  bluetoothText: {
-    marginLeft: 10,
-    color: "#64748b",
-  },
-  connectedText: {
-    color: "#3b82f6",
+  testButtonText: {
+    color: "white",
     fontWeight: "500",
   },
   card: {
