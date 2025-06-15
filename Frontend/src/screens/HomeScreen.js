@@ -13,10 +13,22 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import * as DocumentPicker from "expo-document-picker";
 import { MaterialIcons, FontAwesome, Feather } from "@expo/vector-icons";
-import * as Permissions from "expo-permissions";
-const API_URL = "http://192.168.100.1:7860/predict"; // Replace with your laptop's local IP
+// const API_URL = "http://192.168.100.1:7860/predict"; // Replace with your laptop's local IP
+const API_URL = "http://192.168.0.101:7860/api/predict"; // Replace with your laptop's local IP
 
-const HomeScreen = ({ navigation }) => {
+const chestLabels = [
+  "Anterior Left", "Anterior Left Upper", "Anterior Right",
+  "Anterior Right Lower", "Anterior Right Middle", "Anterior Right Upper",
+  "Anterior Upper Right", "Lateral Left", "Lateral Right", "Posterior",
+  "Posterior Left", "Posterior Left Lower & Right", "Posterior Left Lower",
+  "Posterior Left Middle", "Posterior Left Right", "Posterior Left Upper",
+  "Posterior Right", "Posterior Right Lower", "Posterior Right Middle",
+  "Posterior Right Upper", "Trachea"
+];
+
+
+const HomeScreen = ({ navigation, route }) => {
+  const { metadata } = route.params || {};
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
@@ -24,38 +36,47 @@ const HomeScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Request microphone permissions
-  useEffect(() => {
-    (async () => {
-      if (Platform.OS === "android") {
-        try {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-            {
-              title: "Microphone Permission",
-              message: "BioSonic needs access to your microphone",
-              buttonNeutral: "Ask Me Later",
-              buttonNegative: "Cancel",
-              buttonPositive: "OK",
-            }
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            Alert.alert(
-              "Permission required",
-              "Microphone access is needed to record chest sounds"
-            );
+useEffect(() => {
+  (async () => {
+    if (Platform.OS === "android") {
+      const hasPermission = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+      );
+
+      if (!hasPermission) {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: "Microphone Permission",
+            message: "BioSonic needs access to your microphone",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK",
           }
-        } catch (err) {
-          console.warn(err);
+        );
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            "Permission Denied",
+            "Microphone access is required to record audio."
+          );
+          return;
         }
       }
+    }
 
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-    })();
-  }, []);
+    const { status } = await Audio.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Microphone Permission", "Permission not granted.");
+      return;
+    }
+
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+    });
+  })();
+}, []);
 
   // Start recording
   const startRecording = async () => {
@@ -125,6 +146,26 @@ const HomeScreen = ({ navigation }) => {
   //     Alert.alert("Error", "Failed to select file");
   //   }
   // };
+
+  {metadata && (
+  <View style={{
+    backgroundColor: "#f0f9ff",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#3b82f6"
+  }}>
+    <Text style={{ fontWeight: "bold", color: "#0f172a" }}>Patient Metadata</Text>
+    <Text style={{ color: "#334155" }}>Age: {Math.round(metadata.age * 100)}</Text>
+    <Text style={{ color: "#334155" }}>
+      Gender: {metadata.gender[0] === 1 ? "Female" : metadata.gender[1] === 1 ? "Male" : "N/A"}
+    </Text>
+    <Text style={{ color: "#334155" }}>
+  Chest Location: {chestLabels[route.params.metadata.chest.findIndex((v) => v === 1)]}
+</Text>
+  </View>
+)}
 
   // Test connection to backend
   const testConnection = async () => {
@@ -271,6 +312,12 @@ const HomeScreen = ({ navigation }) => {
     }
 
     setIsLoading(true);
+    const filterSettings = await AsyncStorage.getItem("audioFilters");
+if (filterSettings) {
+  const filters = JSON.parse(filterSettings);
+  formData.append("filters", JSON.stringify(filters));
+}
+
 
     try {
       const formData = new FormData();
@@ -279,9 +326,15 @@ const HomeScreen = ({ navigation }) => {
         name: "recording.wav",
         type: "audio/wav",
       });
-      formData.append("age", "35");
-      formData.append("chest", Array(21).fill(0).join(","));
-      formData.append("gender", "1,0,0");
+      const metadata = route.params?.metadata;
+
+const age = metadata?.age ?? 0.35; // normalized
+const chest = metadata?.chest?.join(",") ?? Array(21).fill(0).join(",");
+const gender = metadata?.gender?.join(",") ?? "0,1,0";
+
+formData.append("age", age.toString());
+formData.append("chest", chest);
+formData.append("gender", gender);
 
       if (userId) {
         formData.append("user_id", userId);
@@ -396,6 +449,49 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.testButtonText}>Test Server Connection</Text>
         </TouchableOpacity>
 
+{route.params?.metadata && (
+  <View
+    style={{
+      backgroundColor: "#f0f9ff",
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 16,
+      borderLeftWidth: 4,
+      borderLeftColor: "#3b82f6",
+    }}
+  >
+    {route.params.metadata.patientName?.length > 0 && (
+      <Text style={{ color: "#334155" }}>
+        Name: {route.params.metadata.patientName}
+      </Text>
+    )}
+
+    <Text style={{ color: "#334155" }}>
+      Age: {Math.round(route.params.metadata.age * 100)}
+    </Text>
+
+    <Text style={{ color: "#334155" }}>
+      Gender:
+      {route.params.metadata.gender[0] === 1
+        ? " Female"
+        : route.params.metadata.gender[1] === 1
+        ? " Male"
+        : " N/A"}
+    </Text>
+
+    <Text style={{ color: "#334155" }}>
+      Chest Location:{" "}
+      {
+        chestLabels[
+          route.params.metadata.chest.findIndex((v) => v === 1)
+        ]
+      }
+    </Text>
+  </View>
+)}
+
+
+
         {/* Recording Section */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Record Chest Sounds</Text>
@@ -450,6 +546,13 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
+        <TouchableOpacity
+  style={[styles.analyzeButton, { backgroundColor: "#0ea5e9" }]}
+  onPress={() => navigation.navigate("Metadata")}
+>
+  <Text style={styles.analyzeButtonText}>Enter Patient Metadata</Text>
+</TouchableOpacity>
+
         {/* Action Button */}
         <TouchableOpacity
           style={[
@@ -467,16 +570,7 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Navigation Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => navigation.navigate("History")}
-        >
-          <MaterialIcons name="history" size={24} color="#3b82f6" />
-          <Text style={styles.footerButtonText}>History</Text>
-        </TouchableOpacity>
-      </View>
+      
     </View>
   );
 };

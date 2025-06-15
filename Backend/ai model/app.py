@@ -127,16 +127,29 @@ async def predict(
         result = {DISEASE_LABELS[i]: f"{round(prediction[i]*100, 2)}%" for i in top_indices}
         
         # Store results in MongoDB
-        prediction_doc = {
-            "timestamp": datetime.now(),
-            "audio_path": file_path,
-            "results": result,
-            "metadata": {
-                "age": age,
-                "chest": chest,
-                "gender": gender
-            }
-        }
+        # Generate Patient ID
+today_str = datetime.now().strftime("%Y%m%d")
+count_today = predictions_collection.count_documents({
+    "timestamp": {
+        "$gte": datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+        "$lt": datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999),
+    }
+})
+patient_id = f"PAT-{today_str}-{count_today + 1:04d}"
+
+# Store results in MongoDB
+prediction_doc = {
+    "timestamp": datetime.now(),
+    "patient_id": patient_id,  # ✅ NEW
+    "audio_path": file_path,
+    "results": result,
+    "metadata": {
+        "age": age,
+        "chest": chest,
+        "gender": gender
+    }
+}
+
         
         if user_id:
             prediction_doc["user_id"] = user_id
@@ -145,12 +158,14 @@ async def predict(
         insert_result = await predictions_collection.insert_one(prediction_doc)
         
         return {
-            "status": "success",
-            "predictions": result,
-            "prediction_id": str(insert_result.inserted_id),
-            "file_received": audio.filename,
-            "file_size": f"{len(content)/1024:.2f} KB"
-        }
+    "status": "success",
+    "predictions": result,
+    "prediction_id": str(insert_result.inserted_id),
+    "patient_id": patient_id,
+    "file_received": audio.filename,
+    "file_size": f"{len(content)/1024:.2f} KB"
+}
+
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

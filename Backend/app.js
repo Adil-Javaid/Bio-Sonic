@@ -21,6 +21,11 @@ const emailVerifyRoutes = require("./routes/SignUp-Verification Routes/mail");
 
 const otpRoutes = require("./routes/SignUp-Verification Routes/otpMail"); 
 
+// New Routes
+const historyRoute = require("./routes/history");
+const predictRoute = require("./routes/predict");
+const diagnosisRoute = require("./routes/diagnosis");
+const userRoute = require("./routes/user");
 
 app.use(
   cors({
@@ -29,6 +34,8 @@ app.use(
       "http://192.168.100.9:8081",
       "http://192.168.1.19:8081",
       "http://10.135.16.104:8081",
+      "http://192.168.0.101:8081",
+      "http://192.168.0.101:8081",
     ],
     methods: "GET, POST, PUT, DELETE",
     credentials: true,
@@ -43,6 +50,12 @@ app.use("/", logoutRoutes);
 app.use("/api/email-verify", emailVerifyRoutes); 
 app.use("/api/user", userRoute); 
 
-app.listen(process.env.port, () => {
+// New Routes
+app.use("/api/predict", predictRoute);
+app.use("/api/predictions", historyRoute);
+app.use("/api/diagnoses", diagnosisRoute);
+
+
+app.listen(port, () => {
   console.log(`Server is running at port: ${port}`);
 });

@@ -186,6 +186,8 @@ const LoginScreen = () => {
       // Ensure we have valid values before storing
       await AsyncStorage.setItem("authToken", response.token || "");
       await AsyncStorage.setItem("userRole", response.role || "user");
+      await AsyncStorage.setItem("userId", response.user.id); // assuming backend sends it
+
 
       Alert.alert("Success", "Logged in successfully!");
       // In your LoginScreen or Signup screen where you navigate after successful auth
