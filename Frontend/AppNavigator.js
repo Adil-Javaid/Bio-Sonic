@@ -13,6 +13,7 @@ import SettingsScreen from "./src/screens/SettingsScreen";
 import SplashScreen from "./src/screens/SplashScreen";
 import MedicalSignUp from "./src/screens/Signup";
 import MetadataScreen from "./src/screens/MetadataScreen";
+import AudioPickerScreen from "./src/screens/AudioPickerScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -46,6 +47,7 @@ const MainTabs = () => {
       <Tab.Screen name="Prediction" component={NewDiagnosisScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="AudioPicker" component={AudioPickerScreen} />
 
     </Tab.Navigator>
   );

@@ -15,7 +15,7 @@ router.use(
       "http://192.168.1.19:8081",
       "http://10.135.16.104:8081",
       "http://172.20.10.2:8081",
-      "http://192.168.0.101:8081",
+      "http://10.135.54.213:8081",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"], // Ensure POST is allowed
     credentials: true,

@@ -9,12 +9,15 @@ import {
   ScrollView,
   SafeAreaView,
   Animated,
+  Dimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import BluetoothManager from "../services/BluetoothManager"; // Custom Bluetooth module
+
+const { width, height } = Dimensions.get("window");
 
 const BASE_URL = "http://192.168.0.101:8080"; // Configurable base URL
 
@@ -42,15 +45,39 @@ const SettingsScreen = ({ navigation }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [deviceName, setDeviceName] = useState("");
+  
+  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const buttonAnim = useRef(new Animated.Value(0)).current;
 
-  // Animation effect
+  // Start animations
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(buttonAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   // Initialize Bluetooth status
@@ -143,28 +170,54 @@ const SettingsScreen = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient
-      colors={["#4fc3f7", "#0288d1", "#01579b"]}
-      style={styles.gradientBackground}
-    >
-      <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={["#1d3557", "#457b9d", "#a8dadc"]}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {/* Background Pattern */}
+        <View style={styles.backgroundPattern}>
+          <View style={[styles.circle, styles.circle1]} />
+          <View style={[styles.circle, styles.circle2]} />
+          <View style={[styles.circle, styles.circle3]} />
+        </View>
+
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Animated.View style={{ opacity: fadeAnim }}>
+          {/* Header */}
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
+            }}
+          >
             <View style={styles.header}>
               <Text style={styles.title}>Settings</Text>
-              <Text style={styles.subtitle}>Customize your BioSonic experience</Text>
+              <Text style={styles.subtitle}>Customize Your BioSonic Experience</Text>
             </View>
+          </Animated.View>
 
+          {/* Animated Content */}
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
+          >
             {/* Bluetooth Status */}
-            <View style={styles.statusCard}>
-              <MaterialIcons
-                name={isConnected ? "bluetooth-connected" : "bluetooth"}
-                size={24}
-                color={isConnected ? "#0288d1" : "#607d8b"}
-              />
-              <Text style={[styles.statusText, isConnected && styles.connectedText]}>
-                {isConnected ? `Connected to ${deviceName}` : "No Stethoscope Connected"}
-              </Text>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Bluetooth Stethoscope</Text>
+              <View style={styles.statusCard}>
+                <MaterialIcons
+                  name={isConnected ? "bluetooth-connected" : "bluetooth"}
+                  size={24}
+                  color={isConnected ? "#f1faee" : "#a8dadc"}
+                />
+                <Text style={[styles.statusText, isConnected && styles.connectedText]}>
+                  {isConnected ? `Connected to ${deviceName}` : "No Stethoscope Connected"}
+                </Text>
+              </View>
             </View>
 
             {/* User Info */}
@@ -172,10 +225,16 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>User Profile</Text>
               {userInfo ? (
                 <View style={styles.userBox}>
-                  <Text style={styles.userName}>
-                    👤 Dr. {userInfo.firstName} {userInfo.lastName}
-                  </Text>
-                  <Text style={styles.userEmail}>📧 {userInfo.email}</Text>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="person-outline" size={20} color="#f1faee" />
+                    <Text style={styles.featureText}>
+                      Dr. {userInfo.firstName} {userInfo.lastName}
+                    </Text>
+                  </View>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="mail-outline" size={20} color="#f1faee" />
+                    <Text style={styles.featureText}>{userInfo.email}</Text>
+                  </View>
                 </View>
               ) : (
                 <Text style={styles.loadingText}>Loading profile...</Text>
@@ -187,15 +246,18 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>Audio Filters</Text>
               {Object.keys(filters).map((key) => (
                 <View style={styles.filterRow} key={key}>
-                  <Text style={styles.label}>
-                    {key.charAt(0).toUpperCase() + key.slice(1)} Filter
-                  </Text>
+                  <View style={styles.featureItem}>
+                    <Ionicons name="filter-outline" size={20} color="#f1faee" />
+                    <Text style={styles.featureText}>
+                      {key.charAt(0).toUpperCase() + key.slice(1)} Filter
+                    </Text>
+                  </View>
                   <Switch
                     value={filters[key]}
                     onValueChange={() => toggleFilter(key)}
-                    thumbColor="#0288d1"
-                    trackColor={{ false: "#90a4ae", true: "#4fc3f7" }}
-                    accessibilityLabel={`${key} Filter Toggle`}
+                    thumbColor="#f1faee"
+                    trackColor={{ false: "#a8dadc", true: "#f1faee" }}
+                    accessibilityLabel={`${key.charAt(0).toUpperCase() + key.slice(1)} Filter Toggle`}
                   />
                 </View>
               ))}
@@ -204,13 +266,36 @@ const SettingsScreen = ({ navigation }) => {
             {/* Account Actions */}
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Account</Text>
-              <TouchableOpacity
-                style={styles.logoutButton}
-                onPress={handleLogout}
-                accessibilityLabel="Log Out"
+              <Animated.View
+                style={{
+                  opacity: buttonAnim,
+                  transform: [
+                    {
+                      translateY: buttonAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      }),
+                    },
+                  ],
+                }}
               >
-                <Text style={styles.logoutText}>🚪 Log Out</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={handleLogout}
+                  accessibilityLabel="Log Out"
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={["#f1faee", "#a8dadc"]}
+                    style={styles.buttonGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Ionicons name="log-out-outline" size={20} color="#1d3557" />
+                    <Text style={styles.buttonTextPrimary}>Log Out</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
             </View>
 
             {/* Navigation Menu */}
@@ -218,142 +303,173 @@ const SettingsScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => navigation.navigate("Home")}
-                activeOpacity={0.85}
+                activeOpacity={0.8}
                 accessibilityLabel="Home"
               >
-                <Ionicons name="home-outline" size={24} color="#ffffff" style={styles.menuIcon} />
+                <Ionicons name="home-outline" size={24} color="#f1faee" style={styles.menuIcon} />
                 <View style={styles.menuText}>
                   <Text style={styles.menuTitle}>Home</Text>
                   <Text style={styles.menuSubtitle}>Record or upload audio</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#4fc3f7" />
+                <Ionicons name="chevron-forward" size={20} color="#a8dadc" />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => navigation.navigate("History")}
-                activeOpacity={0.85}
+                activeOpacity={0.8}
                 accessibilityLabel="View History"
               >
-                <Ionicons name="time-outline" size={24} color="#ffffff" style={styles.menuIcon} />
+                <Ionicons name="time-outline" size={24} color="#f1faee" style={styles.menuIcon} />
                 <View style={styles.menuText}>
                   <Text style={styles.menuTitle}>View History</Text>
                   <Text style={styles.menuSubtitle}>Review past recordings</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#4fc3f7" />
+                <Ionicons name="chevron-forward" size={20} color="#a8dadc" />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => navigation.navigate("Profile")}
-                activeOpacity={0.85}
-                accessibilityLabel="Doctor Profile"
-              >
-                <Ionicons name="person-circle-outline" size={24} color="#ffffff" style={styles.menuIcon} />
-                <View style={styles.menuText}>
-                  <Text style={styles.menuTitle}>Doctor Profile</Text>
-                  <Text style={styles.menuSubtitle}>Manage account details</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#4fc3f7" />
-              </TouchableOpacity>
+    
             </View>
 
             <Text style={styles.footerText}>BioSonic © 2025 | Medical Support Available</Text>
           </Animated.View>
+
+          {/* Medical Icons Decoration */}
+          <View style={styles.decorativeIcons}>
+            <Ionicons name="heart-outline" size={24} color="#a8dadc" style={styles.decorIcon1} />
+            <Ionicons name="medical-outline" size={20} color="#a8dadc" style={styles.decorIcon2} />
+            <Ionicons name="fitness-outline" size={22} color="#a8dadc" style={styles.decorIcon3} />
+          </View>
         </ScrollView>
-      </SafeAreaView>
-    </LinearGradient>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  gradientBackground: {
-    flex: 1,
-  },
   container: {
     flex: 1,
   },
+  gradient: {
+    flex: 1,
+  },
   scrollContainer: {
-    padding: 20,
+    paddingHorizontal: 24,
     paddingBottom: 40,
+  },
+  backgroundPattern: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  circle: {
+    position: "absolute",
+    borderRadius: 1000,
+    backgroundColor: "rgba(241, 250, 238, 0.1)",
+  },
+  circle1: {
+    width: 200,
+    height: 200,
+    top: -50,
+    right: -50,
+  },
+  circle2: {
+    width: 150,
+    height: 150,
+    bottom: 100,
+    left: -75,
+  },
+  circle3: {
+    width: 100,
+    height: 100,
+    top: height * 0.3,
+    left: width * 0.8,
   },
   header: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 42,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#f1faee",
+    textAlign: "center",
+    letterSpacing: 1,
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    paddingTop: 34,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#b2ebf2",
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#a8dadc",
+    textAlign: "center",
+    marginBottom: 16,
     textShadowColor: "rgba(0,0,0,0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
-    textAlign: "center",
-  },
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  statusText: {
-    marginLeft: 12,
-    fontSize: 16,
-    color: "#0f172a",
-    fontWeight: "500",
-  },
-  connectedText: {
-    color: "#0288d1",
-    fontWeight: "600",
   },
   card: {
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(241, 250, 238, 0.1)",
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(241, 250, 238, 0.2)",
+  },
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(241, 250, 238, 0.2)",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+  },
+  statusText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#f1faee",
+    fontWeight: "500",
+  },
+  connectedText: {
+    color: "#f1faee",
+    fontWeight: "600",
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
-    color: "#ffffff",
+    color: "#f1faee",
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
     marginBottom: 16,
   },
   userBox: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(241, 250, 238, 0.2)",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#4fc3f7",
+    borderColor: "rgba(241, 250, 238, 0.3)",
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0f172a",
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  userEmail: {
+  featureText: {
+    color: "#f1faee",
     fontSize: 16,
-    color: "#0f172a",
+    fontWeight: "500",
+    marginLeft: 8,
   },
   loadingText: {
     fontSize: 16,
-    color: "#b2ebf2",
+    color: "#a8dadc",
     textShadowColor: "rgba(0,0,0,0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
@@ -364,31 +480,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
   },
-  label: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#ffffff",
-    textShadowColor: "rgba(0,0,0,0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  logoutButton: {
-    backgroundColor: "#ef4444",
-    padding: 18,
-    borderRadius: 12,
+  button: {
+    width: "100%",
+    height: 56,
+    borderRadius: 16,
+    justifyContent: "center",
     alignItems: "center",
     marginTop: 16,
   },
-  logoutText: {
-    color: "#ffffff",
-    fontWeight: "700",
+  primaryButton: {
+    overflow: "hidden",
+  },
+  buttonGradient: {
+    flex: 1,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  buttonTextPrimary: {
+    color: "#1d3557",
     fontSize: 18,
-    textShadowColor: "rgba(0,0,0,0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    fontWeight: "700",
+    marginLeft: 8,
   },
   menuContainer: {
     marginBottom: 20,
@@ -397,11 +513,11 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(241, 250, 238, 0.1)",
     padding: 18,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(241, 250, 238, 0.2)",
   },
   menuIcon: {
     marginRight: 16,
@@ -412,26 +528,50 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#f1faee",
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   menuSubtitle: {
     fontSize: 14,
-    color: "#b2ebf2",
+    color: "#a8dadc",
     textShadowColor: "rgba(0,0,0,0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },
   footerText: {
     fontSize: 12,
-    color: "#b2ebf2",
-    textShadowColor: "rgba(0,0,0,0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    color: "#a8dadc",
     textAlign: "center",
     opacity: 0.8,
+    marginTop: 20,
+  },
+  decorativeIcons: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: "none",
+  },
+  decorIcon1: {
+    position: "absolute",
+    top: height * 0.15,
+    left: 30,
+    opacity: 0.3,
+  },
+  decorIcon2: {
+    position: "absolute",
+    bottom: height * 0.25,
+    right: 40,
+    opacity: 0.3,
+  },
+  decorIcon3: {
+    position: "absolute",
+    top: height * 0.4,
+    right: 20,
+    opacity: 0.3,
   },
 });
 

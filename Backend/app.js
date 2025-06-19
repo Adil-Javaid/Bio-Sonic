@@ -25,7 +25,7 @@ const otpRoutes = require("./routes/SignUp-Verification Routes/otpMail");
 const historyRoute = require("./routes/history");
 const predictRoute = require("./routes/predict");
 const diagnosisRoute = require("./routes/diagnosis");
-const userRoute = require("./routes/user");
+
 
 app.use(
   cors({
@@ -35,7 +35,7 @@ app.use(
       "http://192.168.1.19:8081",
       "http://10.135.16.104:8081",
       "http://192.168.0.101:8081",
-      "http://192.168.0.101:8081",
+      "http://10.135.54.213:8081",
     ],
     methods: "GET, POST, PUT, DELETE",
     credentials: true,
